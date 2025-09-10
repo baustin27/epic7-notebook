@@ -1,0 +1,83 @@
+/* Enhanced focus indicators with sufficient contrast */
+*:focus-visible {
+  outline: 2px solid #3b82f6 !important;
+  outline-offset: 2px;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  *:focus-visible {
+    outline: 3px solid #000 !important;
+    outline-offset: 2px;
+  }
+  
+  .high-contrast {
+    border: 1px solid #000;
+    background-color: #fff;
+    color: #000;
+  }
+  
+  .high-contrast-inverse {
+    border: 1px solid #fff;
+    background-color: #000;
+    color: #fff;
+  }
+}
+
+/* Screen reader only styles (if not using Tailwind sr-only) */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.sr-only:focus,
+.sr-only:active {
+  position: static;
+  width: auto;
+  height: auto;
+  margin: 0;
+  overflow: visible;
+  clip: auto;
+  white-space: normal;
+}
+
+/* Reduced motion for accessibility */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Click target minimum size enforcement */
+@media (pointer: coarse) {
+  button,
+  [role="button"],
+  a[href],
+  input[type="button"],
+  input[type="submit"],
+  input[type="reset"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* No flashing content */
+@keyframes no-flash {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 1; }
+}
+
+.flashing {
+  animation: no-flash 1s infinite;
+}

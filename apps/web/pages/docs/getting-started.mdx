@@ -1,0 +1,309 @@
+---
+title: Getting Started
+description: Set up your development environment and run the AI Chat Platform locally
+---
+
+# Getting Started
+
+This guide will help you set up the AI Chat Platform for local development. Follow these steps to get started quickly.
+
+## Prerequisites
+
+Before you begin, ensure you have the following installed:
+
+- **Node.js**: Version 18.17.0 or higher
+- **npm**: Version 9.0.0 or higher (comes with Node.js)
+- **Git**: For cloning the repository
+- **Supabase Account**: For database and authentication
+- **OpenRouter Account**: For AI model access
+
+### System Requirements
+
+- **RAM**: Minimum 4GB, recommended 8GB+
+- **Storage**: 2GB free space
+- **OS**: macOS, Linux, or Windows (WSL recommended)
+
+## Quick Setup
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/your-org/ai-chat-platform.git
+cd ai-chat-platform/apps/web
+```
+
+### 2. Install Dependencies
+
+```bash
+npm install
+```
+
+### 3. Environment Configuration
+
+Copy the example environment file and configure your settings:
+
+```bash
+cp .env.example .env.local
+```
+
+Edit `.env.local` with your configuration:
+
+```env
+# Supabase Configuration
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+
+# OpenRouter Configuration
+OPENROUTER_API_KEY=your_openrouter_api_key
+
+# Application Configuration
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+NODE_ENV=development
+
+# Database Configuration (if using local Supabase)
+DATABASE_URL=postgresql://postgres:password@localhost:54322/postgres
+```
+
+### 4. Database Setup
+
+#### Option A: Use Supabase Cloud (Recommended)
+
+1. Create a new project at [supabase.com](https://supabase.com)
+2. Copy your project URL and API keys to `.env.local`
+3. Run the database migrations:
+
+```bash
+# Install Supabase CLI if not already installed
+npm install -g supabase
+
+# Link your project
+supabase link --project-ref your-project-ref
+
+# Push migrations
+supabase db push
+```
+
+#### Option B: Local Supabase Development
+
+```bash
+# Start local Supabase
+supabase start
+
+# This will start PostgreSQL, Supabase services, and provide local URLs
+```
+
+### 5. Run the Development Server
+
+```bash
+npm run dev
+```
+
+The application will be available at [http://localhost:3000](http://localhost:3000).
+
+## Detailed Setup Guide
+
+### Environment Variables Explained
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Your Supabase project URL | Yes |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anonymous key | Yes |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key | Yes |
+| `OPENROUTER_API_KEY` | OpenRouter API key for AI models | Yes |
+| `NEXT_PUBLIC_APP_URL` | Application base URL | Yes |
+| `DATABASE_URL` | PostgreSQL connection string | No (for local dev) |
+| `NODE_ENV` | Environment (development/production) | Yes |
+
+### Database Schema Setup
+
+The application uses several database tables. The schema is automatically created when you run the migrations.
+
+Key tables include:
+- `users` - User accounts and profiles
+- `organizations` - Multi-tenant organization support
+- `conversations` - Chat conversation threads
+- `messages` - Individual messages in conversations
+- `prompts` - Reusable prompt templates
+- `user_settings` - User preferences and settings
+
+### Authentication Setup
+
+The platform uses Supabase Auth for user authentication. Configure the following in your Supabase dashboard:
+
+1. **Authentication Providers**: Enable email/password authentication
+2. **Site URL**: Set to `http://localhost:3000` for development
+3. **Redirect URLs**: Add your application URLs
+
+### AI Model Integration
+
+The platform integrates with OpenRouter for AI model access:
+
+1. Sign up at [openrouter.ai](https://openrouter.ai)
+2. Generate an API key
+3. Add the key to your `.env.local` file
+4. The application supports multiple models including GPT-4, Claude, and others
+
+## Development Workflow
+
+### Running Tests
+
+```bash
+# Run all tests
+npm test
+
+# Run tests in watch mode
+npm run test:watch
+
+# Run specific test suites
+npm run test:unit
+npm run test:e2e
+```
+
+### Code Quality
+
+```bash
+# Lint code
+npm run lint
+
+# Type checking
+npm run type-check
+
+# Format code
+npx prettier --write .
+```
+
+### Storybook (Component Development)
+
+```bash
+# Start Storybook
+npm run storybook
+
+# Build Storybook
+npm run build-storybook
+```
+
+## Troubleshooting
+
+### Common Issues
+
+#### Port Already in Use
+
+If port 3000 is already in use:
+
+```bash
+# Use a different port
+npm run dev -- -p 3001
+```
+
+#### Database Connection Issues
+
+1. Ensure Supabase is running (if using local)
+2. Check your environment variables
+3. Verify network connectivity
+
+#### Authentication Problems
+
+1. Check Supabase configuration
+2. Ensure redirect URLs are correct
+3. Verify API keys are valid
+
+#### Build Errors
+
+```bash
+# Clear Next.js cache
+rm -rf .next
+
+# Reinstall dependencies
+rm -rf node_modules package-lock.json
+npm install
+```
+
+### Debug Mode
+
+Enable debug logging by setting:
+
+```env
+DEBUG=*
+```
+
+### Performance Issues
+
+For better development performance:
+
+```bash
+# Use Next.js turbo mode
+npm run docs:dev
+```
+
+## Database Setup and Testing
+
+### Execute Database Schema
+
+1. **Open Supabase Dashboard**
+   - Go to https://supabase.com/dashboard
+   - Select your project
+
+2. **Navigate to SQL Editor**
+   - Click **"SQL Editor"** in the left sidebar
+   - Click **"New Query"**
+
+3. **Execute Schema**
+   - Copy the entire contents of `docs/database-schema.sql`
+   - Paste into the SQL Editor
+   - Click **"Run"** (or press Ctrl+Enter)
+
+4. **Verify Tables Created**
+   - Go to **"Table Editor"** in the left sidebar
+   - You should see tables: `users`, `conversations`, `messages`, `user_settings`
+
+### Verify Row Level Security
+
+1. **Check RLS Policies**
+   - In Table Editor, click on each table
+   - Go to **"RLS Policies"** tab
+   - Verify policies are active
+
+2. **Test RLS**
+   ```sql
+   -- Test RLS by trying to access data without auth
+   SELECT * FROM users LIMIT 1;
+   -- Should return no results (empty)
+   ```
+
+### Test Real-time Features
+
+1. **Test Real-time Subscriptions**
+   - Open two browser tabs to http://localhost:3000
+   - Sign in on both tabs
+   - Create a conversation on one tab
+   - Verify it appears on the second tab automatically
+
+2. **Test Message Real-time**
+   - Send a message in one tab
+   - Verify it appears instantly in the other tab
+
+## Next Steps
+
+Once you have the application running locally:
+
+1. **Explore the Interface**: Familiarize yourself with the chat interface
+2. **Try Different Models**: Test various AI models available through OpenRouter
+3. **Customize Settings**: Adjust model parameters and preferences
+4. **Review Code**: Examine the codebase structure in `src/`
+5. **Run Tests**: Ensure everything works correctly
+
+## Production Deployment
+
+For production deployment, see the [Deployment Guide](deployment).
+
+## Getting Help
+
+- 📖 **Documentation**: Check this documentation for detailed guides
+- 🐛 **Issues**: Report bugs on [GitHub](https://github.com/your-org/ai-chat-platform/issues)
+- 💬 **Discussions**: Join community discussions
+- 📧 **Support**: Contact the development team
+
+---
+
+*Happy coding! 🚀*

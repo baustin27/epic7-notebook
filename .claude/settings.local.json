@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl:*)",
+      "Bash(playwright --version)",
+      "Bash(npx playwright screenshot:*)",
+      "Bash(pnpm dev:*)",
+      "Bash(node:*)",
+      "Bash(pnpm:*)",
+      "Bash(rm:*)",
+      "Read(//root/**)",
+      "Bash(test:*)",
+      "Bash(NEXT_PUBLIC_SUPABASE_URL=https://ujqdkiewshswocpgtbne.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_AhgStI4ioOFXeXiS3M4S8w_F5Z0q_6n node debug-connection.js)",
+      "Bash(playwright screenshot:*)",
+      "Bash(sudo chown:*)",
+      "Bash(npx playwright:*)",
+      "Bash(NEXT_PUBLIC_SUPABASE_URL=https://ujqdkiewshswocpgtbne.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_AhgStI4ioOFXeXiS3M4S8w_F5Z0q_6n node -e \"\nconst { createClient } = require(''@supabase/supabase-js'');\nconst supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);\n\nconsole.log(''Testing admin login...'');\nsupabase.auth.signInWithPassword({ \n  email: ''baustin2786@gmail.com'', \n  password: ''2A59cq!CC'' \n}).then(result => {\n  if (result.error) {\n    console.error(''Login failed:'', result.error.message);\n  } else {\n    console.log(''✅ Admin login successful!'');\n    console.log(''User ID:'', result.data.user.id);\n    console.log(''Email:'', result.data.user.email);\n  }\n}).catch(err => {\n  console.error(''Test failed:'', err.message);\n});\n\")",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:arxiv.org)",
+      "Bash(sudo apt:*)",
+      "Bash(sudo apt install:*)",
+      "Bash(sudo systemctl start:*)",
+      "Bash(sudo systemctl status:*)",
+      "Bash(pkill:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

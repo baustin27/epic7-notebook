@@ -1,0 +1,126 @@
+name: Performance Monitoring
+
+on:
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["Deploy"]
+    types:
+      - completed
+
+jobs:
+  performance-monitoring:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 18.x
+        cache: 'npm'
+        cache-dependency-path: apps/web/package-lock.json
+
+    - name: Install dependencies
+      run: npm ci
+      working-directory: apps/web
+
+    - name: Build application
+      run: npm run build
+      working-directory: apps/web
+
+    - name: Analyze bundle size
+      run: npm run build:analyze
+      working-directory: apps/web
+
+    - name: Check bundle size regression
+      run: |
+        # Get current bundle size
+        CURRENT_SIZE=$(find .next/static/chunks -name "*.js" -exec stat -f%z {} \; | awk '{sum += $1} END {print sum}')
+        echo "Current bundle size: $CURRENT_SIZE bytes"
+
+        # Check against baseline (you would store this in a file or use an action)
+        BASELINE_SIZE=5000000  # 5MB baseline, adjust as needed
+        if (( CURRENT_SIZE > BASELINE_SIZE )); then
+          echo "⚠️ Bundle size increased: $CURRENT_SIZE > $BASELINE_SIZE"
+          echo "bundle_size_increased=true" >> $GITHUB_ENV
+        else
+          echo "✅ Bundle size within limits"
+        fi
+      working-directory: apps/web
+
+    - name: Run Lighthouse performance test
+      run: npm run lighthouse
+      working-directory: apps/web
+      continue-on-error: true
+
+    - name: Check Core Web Vitals
+      run: |
+        # Parse Lighthouse results and check CWV
+        if [ -f "apps/web/test-results/lighthouse/lhr-*.json" ]; then
+          LCP=$(jq '.audits["largest-contentful-paint"].numericValue' apps/web/test-results/lighthouse/lhr-*.json)
+          FID=$(jq '.audits["max-potential-fid"].numericValue' apps/web/test-results/lighthouse/lhr-*.json)
+          CLS=$(jq '.audits["cumulative-layout-shift"].numericValue' apps/web/test-results/lighthouse/lhr-*.json)
+
+          echo "LCP: $LCP ms"
+          echo "FID: $FID ms"
+          echo "CLS: $CLS"
+
+          # Check thresholds
+          if (( $(echo "$LCP > 2500" | bc -l) )) || (( $(echo "$FID > 100" | bc -l) )) || (( $(echo "$CLS > 0.1" | bc -l) )); then
+            echo "⚠️ Core Web Vitals regression detected"
+            echo "cwv_regression=true" >> $GITHUB_ENV
+          fi
+        fi
+      working-directory: .
+
+    - name: Send performance alert
+      if: env.bundle_size_increased == 'true' || env.cwv_regression == 'true'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const alerts = [];
+          if (process.env.bundle_size_increased === 'true') {
+            alerts.push('📦 Bundle size increased');
+          }
+          if (process.env.cwv_regression === 'true') {
+            alerts.push('⚡ Core Web Vitals regression');
+          }
+
+          github.rest.issues.create({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            title: `🚨 Performance Alert: ${alerts.join(', ')}`,
+            body: `Performance monitoring detected issues:\n\n${alerts.map(alert => `- ${alert}`).join('\n')}\n\nPlease review the latest performance metrics.`,
+            labels: ['performance', 'alert']
+          });
+
+    - name: Upload performance results
+      uses: actions/upload-artifact@v3
+      with:
+        name: performance-results
+        path: |
+          apps/web/test-results/lighthouse/
+          apps/web/.next/static/chunks/
+        retention-days: 30
+
+  health-check:
+    runs-on: ubuntu-latest
+    needs: performance-monitoring
+
+    steps:
+    - name: Health check production
+      run: |
+        # Add health check logic here
+        echo "Performing health checks..."
+        # You would typically check API endpoints, database connections, etc.
+
+    - name: API performance monitoring
+      run: |
+        # Add API monitoring logic
+        echo "Monitoring API performance..."
+        # Check response times, error rates, etc.

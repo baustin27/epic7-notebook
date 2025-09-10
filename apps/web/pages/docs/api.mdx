@@ -1,0 +1,527 @@
+---
+title: API Reference
+description: Complete API documentation with TypeScript interfaces and examples
+---
+
+# API Reference
+
+This section provides comprehensive documentation for the AI Chat Platform API, including TypeScript interfaces, endpoint specifications, and interactive examples.
+
+## Authentication
+
+All API requests require authentication using Supabase JWT tokens. Include the token in the Authorization header:
+
+```
+Authorization: Bearer <your-jwt-token>
+```
+
+## Base URL
+
+```
+https://your-domain.com/api
+```
+
+## Core Data Types
+
+### Database Schema
+
+The platform uses the following core database tables:
+
+#### Organizations
+
+```typescript
+interface Organization {
+  id: string
+  name: string
+  slug: string
+  description?: string
+  logo_url?: string
+  website_url?: string
+  industry?: string
+  size?: 'startup' | 'small' | 'medium' | 'large' | 'enterprise'
+  status: 'active' | 'suspended' | 'pending' | 'inactive'
+  settings: Json
+  billing_settings: Json
+  created_by?: string
+  created_at: string
+  updated_at: string
+}
+```
+
+#### Users
+
+```typescript
+interface User {
+  id: string
+  email: string
+  full_name?: string
+  avatar_url?: string
+  api_keys?: Json
+  role: 'user' | 'admin'
+  organization_id?: string
+  default_organization_id?: string
+  created_at: string
+  updated_at: string
+}
+```
+
+#### Conversations
+
+```typescript
+interface Conversation {
+  id: string
+  title: string
+  user_id: string
+  model: string
+  is_active: boolean
+  organization_id?: string
+  created_at: string
+  updated_at: string
+}
+```
+
+#### Messages
+
+```typescript
+interface Message {
+  id: string
+  conversation_id: string
+  role: 'user' | 'assistant' | 'system'
+  content: string
+  metadata?: Json
+  organization_id?: string
+  created_at: string
+  updated_at: string
+}
+```
+
+#### Prompts
+
+```typescript
+interface Prompt {
+  id: string
+  user_id: string
+  title: string
+  content: string
+  category: string
+  description?: string
+  tags?: string[]
+  is_custom: boolean
+  organization_id?: string
+  created_at: string
+  updated_at: string
+}
+```
+
+## API Endpoints
+
+### Organizations
+
+#### GET /api/organizations
+
+Retrieve organizations for the authenticated user.
+
+**Response:**
+```json
+{
+  "organizations": [
+    {
+      "id": "org_123",
+      "name": "Acme Corp",
+      "slug": "acme-corp",
+      "description": "Leading tech company",
+      "status": "active",
+      "created_at": "2024-01-01T00:00:00Z"
+    }
+  ]
+}
+```
+
+#### POST /api/organizations
+
+Create a new organization.
+
+**Request Body:**
+```json
+{
+  "name": "New Organization",
+  "slug": "new-org",
+  "description": "Description of the organization"
+}
+```
+
+#### GET /api/organizations/[id]
+
+Get organization details by ID.
+
+#### PUT /api/organizations/[id]
+
+Update organization information.
+
+#### DELETE /api/organizations/[id]
+
+Delete an organization (admin only).
+
+### Conversations
+
+#### GET /api/conversations
+
+List user conversations.
+
+**Query Parameters:**
+- `limit` (optional): Number of conversations to return (default: 20)
+- `offset` (optional): Pagination offset (default: 0)
+
+**Response:**
+```json
+{
+  "conversations": [
+    {
+      "id": "conv_123",
+      "title": "AI Model Discussion",
+      "model": "gpt-4",
+      "is_active": true,
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    }
+  ],
+  "total": 1
+}
+```
+
+#### POST /api/conversations
+
+Create a new conversation.
+
+**Request Body:**
+```json
+{
+  "title": "New Conversation",
+  "model": "gpt-4"
+}
+```
+
+#### GET /api/conversations/[id]
+
+Get conversation details and messages.
+
+#### PUT /api/conversations/[id]
+
+Update conversation (e.g., change title).
+
+#### DELETE /api/conversations/[id]
+
+Delete a conversation.
+
+### Messages
+
+#### GET /api/conversations/[id]/messages
+
+Get messages for a conversation.
+
+**Response:**
+```json
+{
+  "messages": [
+    {
+      "id": "msg_123",
+      "role": "user",
+      "content": "Hello, how are you?",
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    {
+      "id": "msg_124",
+      "role": "assistant",
+      "content": "I'm doing well, thank you for asking!",
+      "created_at": "2024-01-01T00:00:01Z"
+    }
+  ]
+}
+```
+
+#### POST /api/conversations/[id]/messages
+
+Send a message to a conversation.
+
+**Request Body:**
+```json
+{
+  "content": "Tell me about machine learning",
+  "model": "gpt-4",
+  "settings": {
+    "temperature": 0.7,
+    "maxTokens": 2000
+  }
+}
+```
+
+### Prompts
+
+#### GET /api/prompts
+
+List user prompts.
+
+**Query Parameters:**
+- `category` (optional): Filter by category
+- `search` (optional): Search in title and content
+
+#### POST /api/prompts
+
+Create a new prompt.
+
+**Request Body:**
+```json
+{
+  "title": "Code Review Assistant",
+  "content": "You are an expert code reviewer...",
+  "category": "development",
+  "description": "Helpful for code reviews",
+  "tags": ["coding", "review"]
+}
+```
+
+#### GET /api/prompts/[id]
+
+Get prompt details.
+
+#### PUT /api/prompts/[id]
+
+Update a prompt.
+
+#### DELETE /api/prompts/[id]
+
+Delete a prompt.
+
+### Analytics
+
+#### GET /api/analytics/summary
+
+Get user analytics summary.
+
+**Response:**
+```json
+{
+  "total_conversations": 25,
+  "total_messages": 150,
+  "total_tokens": 45000,
+  "most_used_model": "gpt-4",
+  "average_response_time": 1200,
+  "period": "30d"
+}
+```
+
+#### GET /api/analytics/charts
+
+Get analytics data for charts.
+
+**Query Parameters:**
+- `metric`: Type of metric (conversations, messages, tokens, etc.)
+- `period`: Time period (7d, 30d, 90d)
+
+### Admin Endpoints
+
+#### GET /api/admin/users
+
+List all users (admin only).
+
+#### GET /api/admin/monitoring/health
+
+Get system health status.
+
+#### GET /api/admin/monitoring/stats
+
+Get system statistics.
+
+#### GET /api/admin/security/metrics
+
+Get security metrics.
+
+## Model Settings API
+
+### Model Configuration
+
+```typescript
+interface ModelSettings {
+  temperature: number      // 0.0 - 1.0
+  maxTokens: number        // 100 - 4000
+  systemPrompt: string
+  topP: number            // 0.0 - 1.0
+  presencePenalty: number // -2.0 - 2.0
+  frequencyPenalty: number // -2.0 - 2.0
+}
+
+interface PresetTemplate {
+  id: string
+  name: string
+  description: string
+  icon: string
+  settings: ModelSettings
+}
+```
+
+### Available Presets
+
+The platform includes several preset configurations:
+
+- **Creative**: High creativity with varied responses
+- **Balanced**: Balanced creativity and consistency
+- **Precise**: Focused, accurate, and concise responses
+- **Custom**: User-defined settings
+
+## Error Handling
+
+All API endpoints return standard HTTP status codes:
+
+- `200`: Success
+- `201`: Created
+- `400`: Bad Request
+- `401`: Unauthorized
+- `403`: Forbidden
+- `404`: Not Found
+- `422`: Validation Error
+- `500`: Internal Server Error
+
+Error responses include a JSON object with error details:
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Invalid request parameters",
+    "details": {
+      "field": "email",
+      "reason": "must be a valid email address"
+    }
+  }
+}
+```
+
+## Rate Limiting
+
+API requests are rate limited based on user tier:
+
+- **Free**: 100 requests/hour
+- **Pro**: 1000 requests/hour
+- **Enterprise**: 10000 requests/hour
+
+Rate limit headers are included in responses:
+
+```
+X-RateLimit-Limit: 100
+X-RateLimit-Remaining: 95
+X-RateLimit-Reset: 1640995200
+```
+
+## WebSocket API
+
+Real-time messaging uses WebSocket connections:
+
+```javascript
+const ws = new WebSocket('wss://your-domain.com/api/ws')
+
+ws.onmessage = (event) => {
+  const data = JSON.parse(event.data)
+  // Handle real-time message updates
+}
+```
+
+## Interactive API Playground
+
+Try out the API endpoints directly from this documentation:
+
+```tsx
+import { ApiPlayground } from '@/components/docs/ApiPlayground'
+
+const endpoints = [
+  {
+    method: 'GET',
+    path: '/conversations',
+    description: 'List user conversations'
+  },
+  {
+    method: 'POST',
+    path: '/conversations',
+    description: 'Create a new conversation',
+    body: { title: 'New Chat', model: 'gpt-4' }
+  },
+  {
+    method: 'POST',
+    path: '/conversations/123/messages',
+    description: 'Send a message',
+    body: { content: 'Hello, world!', model: 'gpt-4' }
+  }
+]
+
+<ApiPlayground endpoints={endpoints} />
+```
+
+## SDK Examples
+
+### JavaScript/TypeScript
+
+```typescript
+import { createClient } from '@supabase/supabase-js'
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
+
+// Authenticate user
+const { data: { session } } = await supabase.auth.getSession()
+
+// Make authenticated API request
+const response = await fetch('/api/conversations', {
+  headers: {
+    'Authorization': `Bearer ${session?.access_token}`,
+    'Content-Type': 'application/json'
+  }
+})
+```
+
+### Python
+
+```python
+import requests
+import os
+
+# Set up authentication
+headers = {
+    'Authorization': f'Bearer {os.getenv("SUPABASE_JWT_TOKEN")}',
+    'Content-Type': 'application/json'
+}
+
+# Create a conversation
+response = requests.post(
+    'https://your-domain.com/api/conversations',
+    json={
+        'title': 'New Chat',
+        'model': 'gpt-4'
+    },
+    headers=headers
+)
+
+conversation = response.json()
+```
+
+## API Versioning
+
+The API uses URL-based versioning:
+
+- Current version: `v1`
+- Base URL: `https://your-domain.com/api/v1/`
+
+Legacy endpoints without version prefixes are supported but deprecated.
+
+## Changelog
+
+### v1.0.0 (Current)
+- Initial release with core chat functionality
+- Organization management
+- User authentication
+- Real-time messaging
+- Analytics and monitoring
+
+---
+
+*For more detailed examples and interactive testing, see the [API Playground](https://your-domain.com/docs/api/playground) (coming soon).*

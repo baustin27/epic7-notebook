@@ -1,0 +1,850 @@
+---
+title: Troubleshooting Guide
+description: Common issues, debug tools, and solutions for the AI Chat Platform
+---
+
+# Troubleshooting Guide
+
+This guide helps you diagnose and resolve common issues with the AI Chat Platform. Follow the systematic approach outlined below to identify and fix problems.
+
+## Table of Contents
+
+- [Quick Diagnosis](#quick-diagnosis)
+- [Common Issues](#common-issues)
+- [Debug Tools](#debug-tools)
+- [Performance Issues](#performance-issues)
+- [Database Issues](#database-issues)
+- [Authentication Issues](#authentication-issues)
+- [AI Integration Issues](#ai-integration-issues)
+- [Deployment Issues](#deployment-issues)
+- [Monitoring and Logs](#monitoring-and-logs)
+
+## Quick Diagnosis
+
+### Health Check Script
+
+Run this script to quickly diagnose common issues:
+
+```bash
+#!/bin/bash
+echo "🔍 AI Chat Platform Health Check"
+echo "================================="
+
+# Check Node.js version
+echo "📦 Node.js version:"
+node --version
+
+# Check npm version
+echo "📦 npm version:"
+npm --version
+
+# Check environment variables
+echo "🔧 Environment check:"
+if [ -f .env.local ]; then
+  echo "✅ .env.local exists"
+else
+  echo "❌ .env.local missing"
+fi
+
+# Check database connection
+echo "🗄️ Database connection:"
+if [ -n "$DATABASE_URL" ]; then
+  echo "✅ DATABASE_URL is set"
+else
+  echo "❌ DATABASE_URL not set"
+fi
+
+# Check Supabase connection
+echo "🔗 Supabase connection:"
+if [ -n "$NEXT_PUBLIC_SUPABASE_URL" ]; then
+  echo "✅ Supabase URL is set"
+else
+  echo "❌ Supabase URL not set"
+fi
+
+# Check OpenRouter API
+echo "🤖 OpenRouter API:"
+if [ -n "$OPENROUTER_API_KEY" ]; then
+  echo "✅ OpenRouter API key is set"
+else
+  echo "❌ OpenRouter API key not set"
+fi
+
+echo "================================="
+echo "Health check complete"
+```
+
+### System Status Check
+
+```typescript
+// pages/api/health.ts
+import { NextApiRequest, NextApiResponse } from 'next'
+import { createClient } from '@supabase/supabase-js'
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  const checks = {
+    timestamp: new Date().toISOString(),
+    status: 'healthy',
+    checks: {} as Record<string, any>
+  }
+
+  try {
+    // Database check
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+
+    const { data, error } = await supabase
+      .from('users')
+      .select('count')
+      .limit(1)
+
+    checks.checks.database = error ? 'unhealthy' : 'healthy'
+
+    // OpenRouter API check
+    const openRouterResponse = await fetch('https://openrouter.ai/api/v1/models', {
+      headers: {
+        'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    })
+
+    checks.checks.openrouter = openRouterResponse.ok ? 'healthy' : 'unhealthy'
+
+    // Overall status
+    const allHealthy = Object.values(checks.checks).every(status => status === 'healthy')
+    checks.status = allHealthy ? 'healthy' : 'unhealthy'
+
+    res.status(allHealthy ? 200 : 503).json(checks)
+  } catch (error) {
+    checks.status = 'unhealthy'
+    checks.checks.error = error.message
+    res.status(503).json(checks)
+  }
+}
+```
+
+## Common Issues
+
+### Application Won't Start
+
+**Symptoms:**
+- `npm run dev` fails
+- Port 3000 already in use
+- Build errors
+
+**Solutions:**
+
+1. **Check Node.js version:**
+   ```bash
+   node --version
+   # Should be 18.17.0 or higher
+   ```
+
+2. **Clear cache and reinstall:**
+   ```bash
+   rm -rf .next node_modules package-lock.json
+   npm install
+   ```
+
+3. **Check port availability:**
+   ```bash
+   lsof -i :3000
+   # Kill process if needed
+   kill -9 <PID>
+   ```
+
+4. **Use different port:**
+   ```bash
+   npm run dev -- -p 3001
+   ```
+
+### Build Failures
+
+**Symptoms:**
+- TypeScript compilation errors
+- Module not found errors
+- Build hangs
+
+**Solutions:**
+
+1. **TypeScript errors:**
+   ```bash
+   npm run type-check
+   # Fix reported errors
+   ```
+
+2. **Missing dependencies:**
+   ```bash
+   npm install
+   # Or for specific package
+   npm install <package-name>
+   ```
+
+3. **Clear build cache:**
+   ```bash
+   rm -rf .next
+   npm run build
+   ```
+
+### White Screen / Blank Page
+
+**Symptoms:**
+- Application loads but shows blank page
+- Console errors about missing components
+- Hydration mismatch errors
+
+**Solutions:**
+
+1. **Check browser console for errors**
+2. **Verify environment variables are loaded**
+3. **Check for hydration mismatches:**
+   ```typescript
+   // In _app.tsx or layout.tsx
+   useEffect(() => {
+     // Client-side only code
+   }, [])
+   ```
+
+4. **Verify component imports:**
+   ```typescript
+   // Check for typos in import statements
+   import { ChatInterface } from '../components/ChatInterface' // Correct path?
+   ```
+
+## Debug Tools
+
+### Browser Developer Tools
+
+**Console Logging:**
+```typescript
+// Debug logging utility
+const debug = {
+  log: (message: string, data?: any) => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`🔍 ${message}`, data)
+    }
+  },
+  error: (message: string, error?: any) => {
+    console.error(`❌ ${message}`, error)
+  },
+  warn: (message: string, data?: any) => {
+    console.warn(`⚠️ ${message}`, data)
+  }
+}
+
+// Usage
+debug.log('User authenticated', { userId: '123' })
+debug.error('API request failed', error)
+```
+
+**Network Tab:**
+- Check API request/response status
+- Verify headers and payload
+- Monitor request timing
+
+**Application Tab:**
+- Check local storage for auth tokens
+- Verify service worker status
+- Monitor memory usage
+
+### React Developer Tools
+
+**Component Tree Inspection:**
+```typescript
+// Add debug info to components
+const ChatInterface = ({ conversationId }) => {
+  console.log('ChatInterface render', { conversationId })
+
+  return (
+    <div data-testid="chat-interface">
+      {/* Component content */}
+    </div>
+  )
+}
+```
+
+**Profiler:**
+- Identify slow-rendering components
+- Monitor component re-renders
+- Track state changes
+
+### Redux DevTools (if using Redux)
+
+```typescript
+// Debug state changes
+const store = configureStore({
+  reducer: rootReducer,
+  middleware: (getDefaultMiddleware) =>
+    getDefaultMiddleware().concat(logger),
+  devTools: process.env.NODE_ENV !== 'production'
+})
+```
+
+### Custom Debug Components
+
+```typescript
+// Debug panel component
+const DebugPanel = () => {
+  const [isVisible, setIsVisible] = useState(false)
+
+  if (process.env.NODE_ENV !== 'development') return null
+
+  return (
+    <>
+      <button
+        onClick={() => setIsVisible(!isVisible)}
+        style={{
+          position: 'fixed',
+          bottom: '20px',
+          right: '20px',
+          zIndex: 9999
+        }}
+      >
+        🐛 Debug
+      </button>
+
+      {isVisible && (
+        <div style={{
+          position: 'fixed',
+          bottom: '60px',
+          right: '20px',
+          background: 'white',
+          border: '1px solid #ccc',
+          padding: '10px',
+          zIndex: 9999,
+          maxWidth: '300px'
+        }}>
+          <h3>Debug Information</h3>
+          <pre>{JSON.stringify(debugInfo, null, 2)}</pre>
+        </div>
+      )}
+    </>
+  )
+}
+```
+
+## Performance Issues
+
+### Slow Page Loads
+
+**Symptoms:**
+- Pages take >3 seconds to load
+- Large bundle sizes
+- Slow API responses
+
+**Solutions:**
+
+1. **Bundle Analysis:**
+   ```bash
+   npm run build:analyze
+   # Check bundle size and identify large dependencies
+   ```
+
+2. **Code Splitting:**
+   ```typescript
+   // Dynamic imports for large components
+   const ChatInterface = dynamic(() => import('../components/ChatInterface'), {
+     loading: () => <div>Loading...</div>
+   })
+   ```
+
+3. **Image Optimization:**
+   ```typescript
+   import Image from 'next/image'
+
+   <Image
+     src="/hero-image.jpg"
+     alt="Hero"
+     width={800}
+     height={600}
+     priority // For above-the-fold images
+   />
+   ```
+
+4. **API Optimization:**
+   ```typescript
+   // Implement caching
+   export const getConversations = unstable_cache(
+     async () => {
+       const response = await fetch('/api/conversations')
+       return response.json()
+     },
+     ['conversations'],
+     { revalidate: 60 } // Cache for 60 seconds
+   )
+   ```
+
+### Memory Leaks
+
+**Symptoms:**
+- Increasing memory usage over time
+- Browser becomes unresponsive
+- Components don't unmount properly
+
+**Solutions:**
+
+1. **Cleanup event listeners:**
+   ```typescript
+   useEffect(() => {
+     const handleResize = () => setWindowSize(getWindowSize())
+
+     window.addEventListener('resize', handleResize)
+
+     return () => {
+       window.removeEventListener('resize', handleResize)
+     }
+   }, [])
+   ```
+
+2. **Cancel API requests:**
+   ```typescript
+   useEffect(() => {
+     let isMounted = true
+
+     const fetchData = async () => {
+       try {
+         const response = await fetch('/api/data')
+         if (isMounted) {
+           setData(await response.json())
+         }
+       } catch (error) {
+         if (isMounted) {
+           setError(error)
+         }
+       }
+     }
+
+     fetchData()
+
+     return () => {
+       isMounted = false
+     }
+   }, [])
+   ```
+
+3. **Monitor memory usage:**
+   ```typescript
+   // Performance monitoring
+   const reportWebVitals = (metric) => {
+     console.log(metric)
+     // Send to analytics service
+   }
+
+   export { reportWebVitals }
+   ```
+
+## Database Issues
+
+### Connection Problems
+
+**Symptoms:**
+- "Connection refused" errors
+- Slow query responses
+- Database timeout errors
+
+**Solutions:**
+
+1. **Check connection string:**
+   ```bash
+   # Test database connection
+   psql "$DATABASE_URL" -c "SELECT 1"
+   ```
+
+2. **Verify Supabase status:**
+   - Check [Supabase status page](https://status.supabase.com)
+   - Verify project settings
+
+3. **Connection pooling:**
+   ```typescript
+   // Configure connection pool
+   const pool = new Pool({
+     connectionString: process.env.DATABASE_URL,
+     max: 20, // Maximum connections
+     idleTimeoutMillis: 30000,
+     connectionTimeoutMillis: 2000,
+   })
+   ```
+
+### Query Performance
+
+**Symptoms:**
+- Slow API responses
+- Database CPU usage high
+- Queries timing out
+
+**Solutions:**
+
+1. **Add indexes:**
+   ```sql
+   -- Check slow queries
+   SELECT query, calls, total_time, mean_time
+   FROM pg_stat_statements
+   ORDER BY total_time DESC
+   LIMIT 10;
+
+   -- Add missing indexes
+   CREATE INDEX CONCURRENTLY idx_conversations_user_created
+   ON conversations(user_id, created_at DESC);
+   ```
+
+2. **Optimize queries:**
+   ```typescript
+   // Bad: N+1 queries
+   const conversations = await getConversations()
+   const messages = await Promise.all(
+     conversations.map(conv => getMessages(conv.id))
+   )
+
+   // Good: Single query with joins
+   const conversationsWithMessages = await supabase
+     .from('conversations')
+     .select(`
+       *,
+       messages (*)
+     `)
+     .eq('user_id', userId)
+   ```
+
+3. **Use pagination:**
+   ```typescript
+   const { data, error } = await supabase
+     .from('messages')
+     .select('*')
+     .range(0, 49) // Get first 50 messages
+   ```
+
+## Authentication Issues
+
+### Login Problems
+
+**Symptoms:**
+- "Invalid credentials" errors
+- Redirect loops
+- Session not persisting
+
+**Solutions:**
+
+1. **Check Supabase configuration:**
+   ```typescript
+   // Verify auth configuration
+   const { data: { session } } = await supabase.auth.getSession()
+   console.log('Current session:', session)
+   ```
+
+2. **Verify redirect URLs:**
+   - Check Supabase dashboard auth settings
+   - Ensure callback URLs match your domain
+
+3. **Debug auth flow:**
+   ```typescript
+   // Add auth state listener
+   supabase.auth.onAuthStateChange((event, session) => {
+     console.log('Auth event:', event, session)
+   })
+   ```
+
+### Token Expiration
+
+**Symptoms:**
+- User logged out unexpectedly
+- API requests failing with 401
+
+**Solutions:**
+
+1. **Implement token refresh:**
+   ```typescript
+   // Automatic token refresh
+   supabase.auth.onAuthStateChange(async (event, session) => {
+     if (event === 'TOKEN_REFRESHED') {
+       console.log('Token refreshed')
+     }
+   })
+   ```
+
+2. **Handle expired sessions:**
+   ```typescript
+   // Check session validity
+   const { data: { session }, error } = await supabase.auth.getSession()
+
+   if (error || !session) {
+     // Redirect to login
+     router.push('/auth/login')
+   }
+   ```
+
+## AI Integration Issues
+
+### OpenRouter API Problems
+
+**Symptoms:**
+- "API key invalid" errors
+- Rate limit exceeded
+- Model not available
+
+**Solutions:**
+
+1. **Verify API key:**
+   ```bash
+   # Test API key
+   curl -H "Authorization: Bearer $OPENROUTER_API_KEY" \
+        https://openrouter.ai/api/v1/models
+   ```
+
+2. **Check rate limits:**
+   ```typescript
+   // Implement rate limiting
+   const rateLimit = new Map()
+
+   const checkRateLimit = (userId: string) => {
+     const now = Date.now()
+     const userRequests = rateLimit.get(userId) || []
+
+     // Remove old requests
+     const recentRequests = userRequests.filter(
+       time => now - time < 60000 // 1 minute window
+     )
+
+     if (recentRequests.length >= 10) { // 10 requests per minute
+       throw new Error('Rate limit exceeded')
+     }
+
+     recentRequests.push(now)
+     rateLimit.set(userId, recentRequests)
+   }
+   ```
+
+3. **Handle API errors:**
+   ```typescript
+   try {
+     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+       method: 'POST',
+       headers: {
+         'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+         'Content-Type': 'application/json'
+       },
+       body: JSON.stringify({
+         model: 'openai/gpt-4',
+         messages: [{ role: 'user', content: 'Hello' }]
+       })
+     })
+
+     if (!response.ok) {
+       const error = await response.json()
+       throw new Error(`OpenRouter API error: ${error.error.message}`)
+     }
+
+     const data = await response.json()
+     return data
+   } catch (error) {
+     console.error('AI request failed:', error)
+     throw error
+   }
+   ```
+
+## Deployment Issues
+
+### Build Failures in Production
+
+**Symptoms:**
+- Vercel deployment fails
+- Environment variables not working
+- Missing dependencies
+
+**Solutions:**
+
+1. **Check build logs:**
+   ```bash
+   # Vercel CLI
+   vercel logs
+   ```
+
+2. **Verify environment variables:**
+   - Check Vercel dashboard environment settings
+   - Ensure variables are set for production
+
+3. **Fix dependency issues:**
+   ```json
+   // package.json
+   {
+     "engines": {
+       "node": "18.x",
+       "npm": "9.x"
+     }
+   }
+   ```
+
+### Runtime Errors
+
+**Symptoms:**
+- 500 errors in production
+- Application crashes
+- Performance degradation
+
+**Solutions:**
+
+1. **Check application logs:**
+   ```bash
+   vercel logs --follow
+   ```
+
+2. **Enable error tracking:**
+   ```typescript
+   // Sentry integration
+   import * as Sentry from '@sentry/nextjs'
+
+   Sentry.init({
+     dsn: process.env.SENTRY_DSN,
+     tracesSampleRate: 1.0,
+   })
+   ```
+
+3. **Monitor performance:**
+   ```typescript
+   // Web vitals monitoring
+   export const reportWebVitals = (metric) => {
+     // Send to analytics
+     fetch('/api/analytics/web-vitals', {
+       method: 'POST',
+       body: JSON.stringify(metric)
+     })
+   }
+   ```
+
+## Monitoring and Logs
+
+### Application Logs
+
+```typescript
+// Structured logging
+const logger = {
+  info: (message: string, meta?: any) => {
+    console.log(JSON.stringify({
+      level: 'info',
+      message,
+      timestamp: new Date().toISOString(),
+      ...meta
+    }))
+  },
+  error: (message: string, error?: any, meta?: any) => {
+    console.error(JSON.stringify({
+      level: 'error',
+      message,
+      error: error?.message,
+      stack: error?.stack,
+      timestamp: new Date().toISOString(),
+      ...meta
+    }))
+  }
+}
+
+// Usage
+logger.info('User logged in', { userId: '123' })
+logger.error('Database query failed', error, { query: 'SELECT * FROM users' })
+```
+
+### Error Boundaries
+
+```typescript
+// React error boundary
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props)
+    this.state = { hasError: false, error: null }
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error }
+  }
+
+  componentDidCatch(error, errorInfo) {
+    logger.error('React error boundary caught error', error, {
+      componentStack: errorInfo.componentStack
+    })
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="error-boundary">
+          <h2>Something went wrong</h2>
+          <button onClick={() => this.setState({ hasError: false })}>
+            Try again
+          </button>
+        </div>
+      )
+    }
+
+    return this.props.children
+  }
+}
+```
+
+### Performance Monitoring
+
+```typescript
+// Performance observer
+if (typeof window !== 'undefined') {
+  const observer = new PerformanceObserver((list) => {
+    for (const entry of list.getEntries()) {
+      if (entry.entryType === 'measure') {
+        logger.info('Performance measure', {
+          name: entry.name,
+          duration: entry.duration,
+          startTime: entry.startTime
+        })
+      }
+    }
+  })
+
+  observer.observe({ entryTypes: ['measure'] })
+
+  // Measure component render time
+  const startMark = 'component-render-start'
+  const endMark = 'component-render-end'
+  const measureName = 'component-render'
+
+  performance.mark(startMark)
+  // ... component logic
+  performance.mark(endMark)
+  performance.measure(measureName, startMark, endMark)
+}
+```
+
+### Health Monitoring
+
+```typescript
+// Health check endpoint
+export default async function handler(req, res) {
+  const health = {
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    memory: process.memoryUsage(),
+    version: process.env.npm_package_version
+  }
+
+  // Check critical dependencies
+  try {
+    // Database health
+    const dbHealth = await checkDatabaseHealth()
+    health.database = dbHealth
+
+    // External services
+    const aiHealth = await checkAIHealth()
+    health.ai = aiHealth
+
+  } catch (error) {
+    health.status = 'error'
+    health.error = error.message
+  }
+
+  const statusCode = health.status === 'ok' ? 200 : 503
+  res.status(statusCode).json(health)
+}
+```
+
+---
+
+For additional support, check the [GitHub Issues](https://github.com/your-org/ai-chat-platform/issues) or contact the development team. Include relevant logs, error messages, and steps to reproduce when reporting issues.

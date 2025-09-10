@@ -1,0 +1,200 @@
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: ["Test Suite"]
+    types:
+      - completed
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+        - staging
+        - production
+
+jobs:
+  preview-deploy:
+    if: github.event_name == 'pull_request' && github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 18.x
+        cache: 'npm'
+        cache-dependency-path: apps/web/package-lock.json
+
+    - name: Install dependencies
+      run: npm ci
+      working-directory: apps/web
+
+    - name: Build application
+      run: npm run build
+      working-directory: apps/web
+      env:
+        NEXT_PUBLIC_VERCEL_ENV: preview
+
+    - name: Deploy to Vercel Preview
+      uses: amondnet/vercel-action@v25
+      with:
+        vercel-token: ${{ secrets.VERCEL_TOKEN }}
+        vercel-args: '--prod=false'
+        vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+        vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+        working-directory: apps/web
+
+    - name: Comment PR with preview URL
+      uses: actions/github-script@v7
+      if: github.event_name == 'pull_request'
+      with:
+        script: |
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: `🚀 Preview deployment ready: ${{ steps.deploy.outputs.preview-url }}`
+          })
+
+  staging-deploy:
+    if: (github.ref == 'refs/heads/develop' && github.event.workflow_run.conclusion == 'success') || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging')
+    runs-on: ubuntu-latest
+
+    environment:
+      name: staging
+      url: ${{ steps.deploy.outputs.url }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 18.x
+        cache: 'npm'
+        cache-dependency-path: apps/web/package-lock.json
+
+    - name: Install dependencies
+      run: npm ci
+      working-directory: apps/web
+
+    - name: Build application
+      run: npm run build
+      working-directory: apps/web
+      env:
+        NEXT_PUBLIC_VERCEL_ENV: staging
+
+    - name: Deploy to Vercel Staging
+      id: deploy
+      uses: amondnet/vercel-action@v25
+      with:
+        vercel-token: ${{ secrets.VERCEL_TOKEN }}
+        vercel-args: '--prod=false'
+        vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+        vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+        working-directory: apps/web
+
+    - name: Run smoke tests on staging
+      run: |
+        npx playwright install --with-deps
+        npm run test:e2e -- --grep "smoke"
+      working-directory: apps/web
+      env:
+        BASE_URL: ${{ steps.deploy.outputs.url }}
+
+  production-deploy:
+    if: (github.ref == 'refs/heads/main' && github.event.workflow_run.conclusion == 'success') || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production')
+    runs-on: ubuntu-latest
+
+    environment:
+      name: production
+      url: ${{ steps.deploy.outputs.url }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 18.x
+        cache: 'npm'
+        cache-dependency-path: apps/web/package-lock.json
+
+    - name: Install dependencies
+      run: npm ci
+      working-directory: apps/web
+
+    - name: Build application
+      run: npm run build
+      working-directory: apps/web
+      env:
+        NEXT_PUBLIC_VERCEL_ENV: production
+
+    - name: Manual Approval for Production
+      if: github.event_name != 'workflow_dispatch'
+      uses: trstringer/manual-approval@v1
+      with:
+        secret: ${{ github.TOKEN }}
+        approvers: ${{ github.repository_owner }}
+        minimum-approvals: 1
+        issue-title: "Deploy to Production"
+        issue-body: "Please approve or deny the deployment to production."
+
+    - name: Deploy to Vercel Production
+      id: deploy
+      uses: amondnet/vercel-action@v25
+      with:
+        vercel-token: ${{ secrets.VERCEL_TOKEN }}
+        vercel-args: '--prod=true'
+        vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+        vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+        working-directory: apps/web
+
+    - name: Create deployment record
+      run: |
+        echo "Production deployment completed at $(date)" >> deployment-log.txt
+        echo "Commit: ${{ github.sha }}" >> deployment-log.txt
+        echo "URL: ${{ steps.deploy.outputs.url }}" >> deployment-log.txt
+
+    - name: Upload deployment log
+      uses: actions/upload-artifact@v3
+      with:
+        name: deployment-log
+        path: deployment-log.txt
+
+  rollback:
+    if: failure() && github.ref == 'refs/heads/main' && github.event.workflow_run.conclusion == 'failure'
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Rollback to previous deployment
+      uses: amondnet/vercel-action@v25
+      with:
+        vercel-token: ${{ secrets.VERCEL_TOKEN }}
+        vercel-args: 'rollback'
+        vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+        vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+        working-directory: apps/web
+
+    - name: Notify rollback
+      uses: actions/github-script@v7
+      with:
+        script: |
+          github.rest.issues.create({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            title: `🚨 Production Rollback Triggered`,
+            body: `Automatic rollback initiated due to deployment failure.\n\nCommit: ${{ github.sha }}\nRun: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}`
+          })

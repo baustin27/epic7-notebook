@@ -1,0 +1,9 @@
+{
+  "index": "Introduction",
+  "getting-started": "Getting Started",
+  "api": "API Reference",
+  "deployment": "Deployment",
+  "contributing": "Contributing",
+  "architecture": "Architecture",
+  "troubleshooting": "Troubleshooting"
+}
